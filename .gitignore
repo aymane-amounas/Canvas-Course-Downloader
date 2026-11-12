@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.eggs/
+
+# Virtualenvs
+.venv/
+venv/
+
+# Tooling caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Tool output / secrets — never commit downloaded course data or tokens
+Canvas_Downloads/
+*.env
+.env
+
+# OS / editor junk
+.DS_Store
+**/.DS_Store
+*.swp
+.idea/
+.vscode/
