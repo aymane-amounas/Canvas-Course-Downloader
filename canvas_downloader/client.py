@@ -102,7 +102,23 @@ class CanvasClient:
         return None
 
     def download(self, url: str) -> requests.Response:
-        # Canvas file URLs can redirect to signed CDN URLs. requests strips
-        # Authorization on cross-host redirects; the API client never sends
-        # the bearer token directly to a different host.
-        return self.session.get(url, stream=True, allow_redirects=True, timeout=self.timeout)
+        # On-host URLs are fetched with the API session, which carries the
+        # bearer token; requests drops that token if Canvas redirects to a
+        # different host (for example a signed CDN URL). URLs on any other
+        # host - including third-party media embedded in course HTML - are
+        # fetched WITHOUT the session, so the Canvas token is never disclosed
+        # to an external host on the initial request either.
+        parsed = urlparse(url)
+        if parsed.scheme not in {"http", "https"}:
+            raise CanvasError(f"Refusing to download non-HTTP(S) URL: {url}")
+        if parsed.netloc == self.host:
+            return self.session.get(
+                url, stream=True, allow_redirects=True, timeout=self.timeout
+            )
+        return requests.get(
+            url,
+            stream=True,
+            allow_redirects=True,
+            timeout=self.timeout,
+            headers={"User-Agent": self.session.headers["User-Agent"]},
+        )

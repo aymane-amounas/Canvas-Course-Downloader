@@ -61,3 +61,35 @@ def test_json_raises_on_invalid_body():
     c.session.request = lambda *a, **k: FakeResponse(json_data=ValueError("bad json"))
     with pytest.raises(CanvasError):
         c.json(f"{c.api}/courses/1")
+
+
+def test_download_on_host_uses_authenticated_session():
+    c = make_client()
+    captured: dict = {}
+    c.session.get = lambda url, **kwargs: captured.update(url=url) or FakeResponse()
+    c.download(f"{BASE}/files/1/download")
+    assert captured["url"].startswith(BASE)
+    # The session (and only the session) carries the bearer token.
+    assert c.session.headers["Authorization"] == "Bearer tok"
+
+
+def test_download_off_host_never_sends_token(monkeypatch):
+    # Third-party media linked from course HTML must not receive the Canvas token.
+    c = make_client()
+    captured: dict = {}
+
+    def fake_get(url, **kwargs):
+        captured["url"] = url
+        captured["headers"] = kwargs.get("headers", {})
+        return FakeResponse()
+
+    monkeypatch.setattr(client_mod.requests, "get", fake_get)
+    c.download("https://cdn.thirdparty.example/video.mp4")
+    assert captured["url"] == "https://cdn.thirdparty.example/video.mp4"
+    assert "Authorization" not in captured["headers"]
+
+
+def test_download_rejects_non_http_scheme():
+    c = make_client()
+    with pytest.raises(CanvasError):
+        c.download("file:///etc/passwd")
