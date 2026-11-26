@@ -1,4 +1,4 @@
-"""Canvas Course Downloader — archive accessible Canvas course content."""
+"""Canvas Course Downloader: archive accessible Canvas course content."""
 
 from __future__ import annotations
 
