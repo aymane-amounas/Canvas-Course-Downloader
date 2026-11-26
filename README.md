@@ -31,8 +31,8 @@ It traverses modules, exports pages and course information, downloads Canvas fil
 ## Install
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/canvas-course-downloader.git
-cd canvas-course-downloader
+git clone https://github.com/aymane-amounas/Canvas-Course-Downloader.git
+cd Canvas-Course-Downloader
 
 python -m venv .venv
 # macOS / Linux
