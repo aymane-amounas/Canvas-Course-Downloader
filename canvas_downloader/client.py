@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import ipaddress
 import logging
+import socket
 import time
 from typing import Any
 from urllib.parse import urlparse
@@ -12,6 +14,26 @@ import requests
 from .utils import CanvasError
 
 LOG = logging.getLogger("canvas_downloader")
+
+
+def host_is_public(host: str) -> bool:
+    """False when host resolves to any private, loopback, link-local, reserved,
+    multicast or unspecified address. Blocks off-host download URLs that would
+    reach localhost, the cloud metadata endpoint, or the internal network."""
+    if not host:
+        return False
+    try:
+        infos = socket.getaddrinfo(host, None)
+    except socket.gaierror:
+        return True  # unresolvable: let requests raise a normal connection error
+    for info in infos:
+        ip = ipaddress.ip_address(info[4][0])
+        if (
+            ip.is_private or ip.is_loopback or ip.is_link_local
+            or ip.is_reserved or ip.is_multicast or ip.is_unspecified
+        ):
+            return False
+    return True
 
 
 class CanvasClient:
@@ -107,7 +129,12 @@ class CanvasClient:
         # different host (for example a signed CDN URL). URLs on any other
         # host - including third-party media embedded in course HTML - are
         # fetched WITHOUT the session, so the Canvas token is never disclosed
-        # to an external host on the initial request either.
+        # to an external host on the initial request either. Off-host URLs that
+        # resolve to a private, loopback or link-local address are refused to
+        # keep attacker-authored embeds from reaching localhost, the cloud
+        # metadata endpoint or the internal network. The check covers the
+        # initial request only; a public host that redirects to a private one
+        # is not re-validated.
         parsed = urlparse(url)
         if parsed.scheme not in {"http", "https"}:
             raise CanvasError(f"Refusing to download non-HTTP(S) URL: {url}")
@@ -115,6 +142,8 @@ class CanvasClient:
             return self.session.get(
                 url, stream=True, allow_redirects=True, timeout=self.timeout
             )
+        if not host_is_public(parsed.hostname or ""):
+            raise CanvasError(f"Refusing to download from non-public host: {parsed.netloc}")
         return requests.get(
             url,
             stream=True,
