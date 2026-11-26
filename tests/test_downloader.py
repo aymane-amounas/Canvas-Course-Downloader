@@ -60,6 +60,37 @@ def test_dry_run_writes_nothing(tmp_path: Path):
     assert not (tmp_path / "manifest.json").exists()
 
 
+def test_download_aborts_when_stream_exceeds_expected_size(tmp_path: Path):
+    # Server advertises a small size but streams far more; the write is aborted.
+    client = FakeClient([b"x" * 10, b"y" * 10])
+    mgr = DownloadManager(client, tmp_path, dry_run=False)
+    mgr.save_bytes_from_url("C", "M", "a.bin", "http://x/a", file_id=1, expected_size=5)
+
+    assert mgr.stats["failed"] == 1
+    assert mgr.stats["downloaded"] == 0
+    assert not (tmp_path / "C" / "M" / "a.bin").exists()
+    assert not (tmp_path / "C" / "M" / "a.bin.part").exists()
+
+
+def test_max_bytes_rejects_oversized_declared_file(tmp_path: Path):
+    client = FakeClient([b"data"])
+    mgr = DownloadManager(client, tmp_path, dry_run=False, max_bytes=3)
+    mgr.save_bytes_from_url("C", "M", "a.bin", "http://x/a", file_id=1, expected_size=1000)
+
+    assert mgr.stats["failed"] == 1
+    assert mgr.stats["downloaded"] == 0
+    assert not (tmp_path / "C" / "M" / "a.bin").exists()
+
+
+def test_max_bytes_caps_stream_without_declared_size(tmp_path: Path):
+    client = FakeClient([b"a" * 4, b"b" * 4])
+    mgr = DownloadManager(client, tmp_path, dry_run=False, max_bytes=5)
+    mgr.save_bytes_from_url("C", "M", "a.bin", "http://x/a", file_id=1)
+
+    assert mgr.stats["failed"] == 1
+    assert mgr.stats["downloaded"] == 0
+
+
 def test_save_text_writes_then_skips(tmp_path: Path):
     client = FakeClient([])
     mgr = DownloadManager(client, tmp_path, dry_run=False)

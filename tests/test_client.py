@@ -2,7 +2,7 @@ import pytest
 from conftest import FakeResponse
 
 from canvas_downloader import client as client_mod
-from canvas_downloader.client import CanvasClient
+from canvas_downloader.client import CanvasClient, host_is_public
 from canvas_downloader.utils import CanvasError
 
 BASE = "https://school.instructure.com"
@@ -93,3 +93,23 @@ def test_download_rejects_non_http_scheme():
     c = make_client()
     with pytest.raises(CanvasError):
         c.download("file:///etc/passwd")
+
+
+def test_host_is_public_blocks_internal_addresses():
+    assert host_is_public("127.0.0.1") is False
+    assert host_is_public("169.254.169.254") is False  # cloud metadata endpoint
+    assert host_is_public("10.0.0.5") is False
+    assert host_is_public("::1") is False
+    assert host_is_public("") is False
+
+
+def test_download_refuses_off_host_private_address():
+    # An attacker-authored embed pointing at an internal address must not be fetched.
+    c = make_client()
+    for url in (
+        "http://127.0.0.1/video.mp4",
+        "http://169.254.169.254/latest/meta-data/video.mp4",
+        "http://10.1.2.3/x.mp4",
+    ):
+        with pytest.raises(CanvasError):
+            c.download(url)
