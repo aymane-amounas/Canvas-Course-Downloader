@@ -17,10 +17,13 @@ LOG = logging.getLogger("canvas_downloader")
 
 
 class DownloadManager:
-    def __init__(self, client: CanvasClient, output: Path, dry_run: bool):
+    def __init__(
+        self, client: CanvasClient, output: Path, dry_run: bool, max_bytes: int = 0
+    ):
         self.client = client
         self.output = output.expanduser().resolve()
         self.dry_run = dry_run
+        self.max_bytes = max_bytes
         self.manifest_path = self.output / "manifest.json"
         self.manifest: dict[str, Any] = {"version": 1, "downloads": {}}
         self.stats = {"downloaded": 0, "skipped": 0, "failed": 0, "planned": 0}
@@ -69,12 +72,18 @@ class DownloadManager:
         try:
             response = self.client.download(url)
             response.raise_for_status()
+            cap = self.max_bytes or None
+            if expected_size is not None and cap is not None and expected_size > cap:
+                raise OSError(f"Declared size {expected_size} exceeds limit {cap}")
             total = 0
             with response, partial.open("wb") as stream:
                 for chunk in response.iter_content(1024 * 1024):
                     if chunk:
                         stream.write(chunk)
                         total += len(chunk)
+                        ceiling = expected_size if expected_size is not None else cap
+                        if ceiling is not None and total > ceiling:
+                            raise OSError(f"Download exceeded expected size {ceiling} bytes")
                 stream.flush()
                 os.fsync(stream.fileno())
                 content_length = response.headers.get("Content-Length")

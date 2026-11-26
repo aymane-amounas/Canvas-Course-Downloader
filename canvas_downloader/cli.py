@@ -59,6 +59,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--timeout", type=float, default=30)
     p.add_argument("--retries", type=int, default=5)
     p.add_argument(
+        "--max-file-size",
+        type=float,
+        default=0,
+        help="Skip any single file larger than this many MB (0 = no limit).",
+    )
+    p.add_argument(
         "--include-discussions",
         action="store_true",
         help="Export discussion topics and replies (may contain other students' personal data).",
@@ -129,7 +135,7 @@ def main(argv: list[str] | None = None) -> int:
         if config.dry_run:
             print("DRY RUN: nothing will be written.")
 
-        manager = DownloadManager(client, config.output, config.dry_run)
+        manager = DownloadManager(client, config.output, config.dry_run, config.max_bytes)
         exporter = Exporter(client, manager, config.include_discussions)
         totals = {"modules": 0, "files": 0, "pages": 0, "assignments": 0, "discussions": 0}
         processed = 0

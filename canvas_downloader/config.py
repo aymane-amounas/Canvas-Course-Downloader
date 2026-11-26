@@ -22,6 +22,7 @@ class Config:
     retries: int
     include_discussions: bool
     dry_run: bool
+    max_bytes: int
 
     @classmethod
     def from_args(cls, args: argparse.Namespace) -> Config:
@@ -29,6 +30,8 @@ class Config:
             raise ConfigError("timeout must be positive")
         if args.retries < 0:
             raise ConfigError("retries cannot be negative")
+        if args.max_file_size < 0:
+            raise ConfigError("max-file-size cannot be negative")
 
         token = os.getenv("CANVAS_API_TOKEN") or getpass.getpass("Canvas API token: ").strip()
         if not token:
@@ -42,4 +45,5 @@ class Config:
             retries=args.retries,
             include_discussions=args.include_discussions,
             dry_run=args.dry_run,
+            max_bytes=int(args.max_file_size * 1024 * 1024),
         )
