@@ -20,6 +20,7 @@ It traverses modules, exports pages and course information, downloads Canvas fil
 - Optional Canvas media-object endpoint support when enabled by the institution.
 - Persistent `manifest.json` with file sizes and SHA-256 hashes.
 - Atomic `.part` downloads, retries, timeouts, pagination, portable filenames, and reports.
+- Host-pinned API requests, off-host token isolation, refusal of download URLs that resolve to private or loopback addresses, and an optional `--max-file-size` cap.
 - Dry-run mode and per-course error isolation.
 
 ## Requirements
@@ -104,6 +105,9 @@ canvas-downloader --all --include-discussions
 # Adjust network behavior
 canvas-downloader --all --timeout 60 --retries 8
 
+# Skip any single file larger than 500 MB
+canvas-downloader --all --max-file-size 500
+
 # Help and version
 canvas-downloader --help
 canvas-downloader --version
@@ -181,13 +185,21 @@ Failures are reported in `errors.txt` and `report.json`; the rest of the course 
 
 Downloads are written to a `.part` file and renamed only after the transfer completes and size checks pass. A failed transfer does not become a completed manifest entry.
 
-## Privacy and responsible use
+## Privacy
 
-- Use only with an account and courses you are authorized to access.
-- Follow your institution's copyright, acceptable-use, and data-retention policies.
-- Discussion exports can include other students' names and posts. Keep archives private and secure.
-- Never commit API tokens, downloaded course materials, student information, or private API responses.
-- The software does not bypass Canvas permissions or access controls.
+**Data ownership.** Use only with an account and courses you are authorized to access. Follow your institution's copyright, acceptable-use, and data-retention policies. The tool does not bypass Canvas permissions or access controls; it only reads what your account can already see.
+
+**Local storage.** Everything is written to the output folder on your machine. Nothing is uploaded, phoned home, or sent to any third party. `manifest.json` and `report.json` store file paths, sizes, and SHA-256 hashes only, not the token or any credentials.
+
+**Token handling.** The token is read from `CANVAS_API_TOKEN` or prompted for without echo; it is never written to disk, logs, the manifest, or the reports. It is sent only to your Canvas host over HTTPS. It is never attached to off-host or redirected download URLs, so embedded third-party media (CDNs, player links) never receives it.
+
+**Excluding sensitive content.** Discussions are opt-in via `--include-discussions` and off by default because posts and replies can contain other students' names and personal data. Leave the flag off to keep that content out of the archive entirely.
+
+**Shared-device risk.** Archived material and reports are plain files readable by anyone with access to the machine or backups. On a shared or managed computer, write to a location only you can read, or encrypt the output folder. Do not set `CANVAS_API_TOKEN` in a shared shell profile; export it per session instead.
+
+**Deleting an archive.** The archive is a normal folder with no hidden state. Delete the output directory to remove everything, including `manifest.json` and `report.json`. There is no cache or database elsewhere. If you exported discussions and later want them gone, delete the `Discussions` folders or re-run without `--include-discussions` into a fresh output directory.
+
+**Handling.** Never commit API tokens, downloaded course materials, student information, or private API responses. Revoke the token in Canvas if it is ever exposed.
 
 ## Development
 
@@ -197,7 +209,9 @@ pytest
 ruff check .
 ```
 
-Tests run locally with fixtures and do not need a live Canvas account.
+32 tests cover filename and path safety, the Canvas client (host pinning, pagination, retries, off-host token isolation, SSRF guards), download integrity and size limits, and HTML extraction. They run locally with fixtures and do not need a live Canvas account or network access.
+
+GitHub Actions runs `ruff` and the full suite on every push and pull request against Python 3.10 through 3.13 ([tests.yml](.github/workflows/tests.yml)).
 
 ## Contributing
 
