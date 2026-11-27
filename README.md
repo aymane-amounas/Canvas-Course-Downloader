@@ -1,33 +1,35 @@
 # Canvas Course Downloader
 
-A Python CLI tool for downloading and organizing accessible Canvas course materials for offline study.
+I wrote this because Canvas is where all my course material lives, and I wanted a local copy I could actually keep. It's a Python CLI that walks through a course, pulls down the files and pages you can already see, and lays everything out in folders on disk so you can study offline.
 
-It traverses modules, exports pages and course information, downloads Canvas files and supported direct media, and saves assignments, discussions, announcements, quizzes, and syllabus content when the Canvas API allows access.
+So here's what it actually does: it goes through the modules, exports pages and course info, downloads Canvas files and the direct media it can reach, and saves assignments, discussions, announcements, quizzes, and the syllabus whenever the Canvas API lets it. Nothing more than what your account can already open in a browser.
 
-> **Scope:** This is a best-effort course archive, not a complete Canvas backup. It cannot bypass course permissions, institutional restrictions, locked content, or protected third-party streaming services.
+One thing to be clear about up front: this is a best-effort archive, not a full Canvas backup. It can't get around course permissions, institutional restrictions, locked content, or protected third-party streaming. If Canvas won't show it to you, this won't either.
 
-## Features
+## What it does
 
-- Interactive course selection, `--all`, or one/multiple `--course ID` values.
-- Module-based folders containing module files and exported pages.
-- Embedded Canvas file discovery in pages, assignments, syllabus, and discussions.
-- Direct linked media/document downloads for supported file extensions.
-- Assignment instructions, due dates, points, rubric summaries, and linked resources.
-- Discussion topics and nested replies, opt-in via `--include-discussions` (off by default; posts can contain other students' data).
-- Announcements, quiz metadata, and quiz question metadata when accessible.
-- Course metadata and syllabus export.
-- Course-wide file fallback in `_unorganized_files`.
-- Optional Canvas media-object endpoint support when enabled by the institution.
-- Persistent `manifest.json` with file sizes and SHA-256 hashes.
-- Atomic `.part` downloads, retries, timeouts, pagination, portable filenames, and reports.
-- Host-pinned API requests, off-host token isolation, refusal of download URLs that resolve to private or loopback addresses, and an optional `--max-file-size` cap.
-- Dry-run mode and per-course error isolation.
+- Pick courses interactively, or pass `--all`, or name them with one or more `--course ID` values.
+- Each module becomes a folder with its files and its exported pages inside.
+- It looks for Canvas files embedded in pages, assignments, the syllabus, and discussions, not just the ones listed under Files.
+- Direct media and document links get downloaded when the extension is one it supports.
+- Assignments come with instructions, due dates, points, a rubric summary, and any linked resources.
+- Discussions (topics and nested replies) are opt-in with `--include-discussions`, and off by default, because those posts can contain other students' data.
+- Announcements, quiz metadata, and quiz question metadata come along when they're accessible.
+- Course metadata and the syllabus get exported too.
+- Anything it finds that doesn't belong to a module lands in `_unorganized_files`.
+- There's optional support for the Canvas media-object endpoint, for institutions that have it enabled.
+- A `manifest.json` tracks every file with its size and SHA-256 hash.
+- Downloads are atomic (`.part` files), with retries, timeouts, pagination, filename sanitizing, and a report at the end.
+- The network side is locked down: API requests are pinned to your Canvas host, the token is never sent off-host, download URLs that resolve to a private or loopback address are refused, and `--max-file-size` lets you cap how big a single file can get.
+- Dry-run mode lets you look before you touch anything, and one course failing doesn't take down the rest of the run.
 
-## Requirements
+## What you need
 
-- Python 3.10+
-- Canvas API access token
-- Permission to access the selected courses and files
+- Python 3.10 or newer
+- A Canvas API access token
+- Permission to access the courses and files you're after
+
+That last point isn't boilerplate. The tool uses your own token, so it can only reach what you can reach.
 
 ## Install
 
@@ -45,17 +47,17 @@ python -m pip install --upgrade pip
 pip install -e .
 ```
 
-Or install dependencies directly:
+If you'd rather just grab the dependencies without installing the package:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-## Canvas token setup
+## Setting up your Canvas token
 
-In Canvas, open **Account → Settings → New Access Token** (the wording may vary by institution).
+In Canvas, go to **Account → Settings → New Access Token**. The exact wording changes from one institution to another, so don't be surprised if your menu looks a little different.
 
-Set your Canvas instance and token as environment variables.
+Then set your Canvas instance and token as environment variables.
 
 macOS / Linux:
 
@@ -71,11 +73,11 @@ $env:CANVAS_BASE_URL = "https://your-school.instructure.com"
 $env:CANVAS_API_TOKEN = "your-token"
 ```
 
-If `CANVAS_API_TOKEN` is not set, the program prompts for it without echoing the token.
+If you don't set `CANVAS_API_TOKEN`, the program asks for it at the prompt and doesn't echo what you type, so it won't end up in your shell history or on screen.
 
-**Never hardcode your token, commit it, or share it.** Revoke it in Canvas if exposed.
+A token is a password. Don't hardcode it, don't commit it, don't share it, and if it ever leaks, revoke it in Canvas right away.
 
-## Usage
+## Using it
 
 ```bash
 # Interactive course picker
@@ -113,15 +115,15 @@ canvas-downloader --help
 canvas-downloader --version
 ```
 
-You can also run it without installing the console command:
+If you didn't install the console command, you can run the module directly:
 
 ```bash
 python -m canvas_downloader --all
 ```
 
-`--resume` is included as an explicit reminder, but resuming/skipping completed files is the default. Completed files are checked against their manifest hash and/or expected Canvas file size. Interrupted `.part` files are discarded and downloaded again; HTTP byte-range continuation is not implemented.
+About `--resume`: it's there as an explicit reminder, but resuming is already the default. On every run, completed files are checked against their manifest hash and/or the file size Canvas reports, and skipped if they match. If a `.part` file was left behind by an interruption, it gets thrown away and downloaded again. I didn't implement HTTP byte-range continuation, so a half-finished file starts over rather than picking up where it stopped.
 
-## Output structure
+## How the output is laid out
 
 ```text
 Canvas_Downloads/
@@ -146,9 +148,9 @@ Canvas_Downloads/
     └── ...
 ```
 
-Metadata files containing JSON are saved as text files with JSON-formatted content.
+The metadata files hold JSON, but they're saved with a `.txt` extension so they open cleanly anywhere without a viewer deciding to do something clever with them.
 
-## What can be downloaded?
+## What can actually be downloaded
 
 | Canvas content | Behavior |
 |---|---|
@@ -166,40 +168,40 @@ Metadata files containing JSON are saved as text files with JSON-formatted conte
 | External players | Saves iframe URLs as references; does not rip protected streams |
 | Canvas media objects | Attempts the optional media endpoint and exposed direct sources |
 
-### Important limitations
+### Where it stops
 
-Canvas is configurable by each institution. Some endpoints may be disabled, some content may be hidden by role/section/date settings, and some API responses require additional permissions.
+Every institution configures Canvas differently. Endpoints get disabled, content gets hidden by role or section or date, and some API responses just need permissions your token doesn't have. So there's a real list of things this won't get you:
 
-This tool does **not** promise to download:
+- Kaltura, Panopto, Canvas Studio, YouTube, or any other protected stream.
+- External tools or content hosted outside Canvas when there's no direct downloadable file behind them.
+- Locked quizzes, unpublished content, or files your account can't open.
+- Every single reply and attachment in every discussion configuration.
 
-- Kaltura, Panopto, Canvas Studio, YouTube, or other protected streams.
-- External tools or content hosted outside Canvas when no direct downloadable file is exposed.
-- Locked quizzes, unpublished content, or files your account cannot access.
-- Every reply or attachment in every discussion configuration.
-
-Failures are reported in `errors.txt` and `report.json`; the rest of the course export continues when possible.
+When something fails, it goes into `errors.txt` and `report.json`, and the rest of the course keeps exporting. I'd rather finish the parts that work than bail on the whole run because one file was locked.
 
 ## Resume and integrity
 
-`manifest.json` stores the destination, Canvas file ID when available, byte size, SHA-256 hash, and completion status. A file referenced in multiple modules can be stored in each relevant module folder because the manifest key includes both file identity and destination path.
+`manifest.json` records, for each file, where it was saved, its Canvas file ID when there is one, its byte size, its SHA-256 hash, and whether it finished. The manifest key is both the file identity and the destination path, which is deliberate: if the same file shows up in two modules, it gets stored in each module's folder instead of only one, because that's how you'd expect to find it later.
 
-Downloads are written to a `.part` file and renamed only after the transfer completes and size checks pass. A failed transfer does not become a completed manifest entry.
+Downloads land in a `.part` file first and only get renamed once the transfer finishes and the size checks pass. A transfer that fails never turns into a completed manifest entry, so a half-download can't fool the next run into skipping it.
 
 ## Privacy
 
-**Data ownership.** Use only with an account and courses you are authorized to access. Follow your institution's copyright, acceptable-use, and data-retention policies. The tool does not bypass Canvas permissions or access controls; it only reads what your account can already see.
+This part matters to me, so I'll go through it properly rather than leave it at "be careful."
 
-**Local storage.** Everything is written to the output folder on your machine. Nothing is uploaded, phoned home, or sent to any third party. `manifest.json` and `report.json` store file paths, sizes, and SHA-256 hashes only, not the token or any credentials.
+Start with what you're allowed to do. Use it only with an account and courses you're authorized to access, and follow your institution's copyright, acceptable-use, and data-retention rules. The tool doesn't bypass Canvas permissions or access controls; it only reads what your account can already see.
 
-**Token handling.** The token is read from `CANVAS_API_TOKEN` or prompted for without echo; it is never written to disk, logs, the manifest, or the reports. It is sent only to your Canvas host over HTTPS. It is never attached to off-host or redirected download URLs, so embedded third-party media (CDNs, player links) never receives it.
+Everything it writes stays on your machine. Nothing is uploaded, phoned home, or sent to any third party. `manifest.json` and `report.json` hold file paths, sizes, and SHA-256 hashes, and nothing else, so no token or credentials ever land in them.
 
-**Excluding sensitive content.** Discussions are opt-in via `--include-discussions` and off by default because posts and replies can contain other students' names and personal data. Leave the flag off to keep that content out of the archive entirely.
+The token itself gets careful handling. It's read from `CANVAS_API_TOKEN` or prompted for without echo, and it never gets written to disk, logs, the manifest, or the reports. It's sent only to your Canvas host over HTTPS. It's never attached to an off-host or redirected download URL, so embedded third-party media like CDNs or player links never sees it. On top of that, any off-host URL that resolves to a private or loopback address is refused outright, so a link planted in a course page can't be used to poke at localhost or your internal network.
 
-**Shared-device risk.** Archived material and reports are plain files readable by anyone with access to the machine or backups. On a shared or managed computer, write to a location only you can read, or encrypt the output folder. Do not set `CANVAS_API_TOKEN` in a shared shell profile; export it per session instead.
+Discussions are the one place where other people's data shows up, which is why `--include-discussions` is off by default. Posts and replies can carry other students' names and personal details. Leave the flag off and that content never enters the archive in the first place.
 
-**Deleting an archive.** The archive is a normal folder with no hidden state. Delete the output directory to remove everything, including `manifest.json` and `report.json`. There is no cache or database elsewhere. If you exported discussions and later want them gone, delete the `Discussions` folders or re-run without `--include-discussions` into a fresh output directory.
+Keep in mind that the archive is just plain files. Anyone with access to the machine or your backups can read them. On a shared or managed computer, write to a location only you can read, or encrypt the output folder, and export `CANVAS_API_TOKEN` per session instead of leaving it in a shared shell profile.
 
-**Handling.** Never commit API tokens, downloaded course materials, student information, or private API responses. Revoke the token in Canvas if it is ever exposed.
+Cleaning up is simple because there's no hidden state. The archive is a normal folder, so deleting the output directory removes everything, `manifest.json` and `report.json` included. There's no cache or database tucked away somewhere else. If you exported discussions and later want them gone, delete the `Discussions` folders or re-run without `--include-discussions` into a fresh output directory.
+
+And the obvious one: never commit API tokens, downloaded course materials, student information, or private API responses. If the token is ever exposed, revoke it in Canvas.
 
 ## Development
 
@@ -209,19 +211,19 @@ pytest
 ruff check .
 ```
 
-32 tests cover filename and path safety, the Canvas client (host pinning, pagination, retries, off-host token isolation, SSRF guards), download integrity and size limits, and HTML extraction. They run locally with fixtures and do not need a live Canvas account or network access.
+There are 32 tests covering filename and path safety, the Canvas client (host pinning, pagination, retries, off-host token isolation, SSRF guards), download integrity and size limits, and HTML extraction. They run against local fixtures, so you don't need a live Canvas account or any network access to work on this.
 
-GitHub Actions runs `ruff` and the full suite on every push and pull request against Python 3.10 through 3.13 ([tests.yml](.github/workflows/tests.yml)).
+GitHub Actions runs `ruff` and the full suite on every push and pull request, against Python 3.10 through 3.13 ([tests.yml](.github/workflows/tests.yml)).
 
 ## Contributing
 
-Issues and pull requests are welcome.
+Issues and pull requests are welcome. A few things that make them easier to deal with:
 
-1. Describe bugs or feature requests in an issue.
+1. Open an issue describing the bug or the feature.
 2. Never attach API tokens, student information, or private course materials.
 3. Add tests for behavior changes.
-4. Run `pytest` and `ruff check .`.
-5. Document any Canvas API permission requirements.
+4. Run `pytest` and `ruff check .` before you send it.
+5. Note any Canvas API permissions a change depends on.
 
 ## License
 
@@ -229,14 +231,8 @@ MIT. See [LICENSE](LICENSE).
 
 ## Disclaimer
 
-This project is independent and is not affiliated with, endorsed by, or sponsored by Instructure or Canvas LMS.
+This is an independent project. It's not affiliated with, endorsed by, or sponsored by Instructure or Canvas LMS.
 
 ---
 
-<p align="center">
-  Built with curiosity. Engineered with purpose.
-</p>
-
----
-
-<sub>Built by [Aymane](https://github.com/aymane-amounas)</sub>
+<sub>Built by [lethebyte](https://github.com/aymane-amounas)</sub>
